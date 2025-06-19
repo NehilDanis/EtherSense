@@ -14,31 +14,41 @@ print('Argument List:', str(sys.argv))
 mc_ip_address = '224.0.0.1'
 port = 1024
 chunk_size = 4096
+
+resolution = [1280, 720]
 #rs.log_to_console(rs.log_severity.debug)
 
-def getDepthAndTimestamp(pipeline, depth_filter):
+def getDepthAndTimestamp(align_to_color, pipeline, depth_filter):
     frames = pipeline.wait_for_frames()
     # take owner ship of the frame for further processing
     frames.keep()
+    frames = align_to_color.process(frames)
     depth = frames.get_depth_frame()
-    if depth:
-        depth2 = depth_filter.process(depth)
+    color = frames.get_color_frame()
+    if depth and color:
+        # depth2 = depth_filter.process(depth)
+        depth2 = depth
         # take owner ship of the frame for further processing
         depth2.keep()
+        color.keep()
         # represent the frame as a numpy array
-        depthData = depth2.as_frame().get_data()        
+        depthData = depth2.as_frame().get_data() 
+        colorData = color.as_frame().get_data()       
         depthMat = np.asanyarray(depthData)
+        colorMat = np.asanyarray(colorData)
         ts = frames.get_timestamp()
-        return depthMat, ts
+        return colorMat, depthMat, ts
     else:
-        return None, None
+        return None, None, None
 def openPipeline():
     cfg = rs.config()
-    cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, 15)
+    cfg.enable_stream(rs.stream.color, resolution[0], resolution[1], rs.format.bgr8, 15)    
     pipeline = rs.pipeline()
+    align = rs.align(rs.stream.color)
     pipeline_profile = pipeline.start(cfg)
     sensor = pipeline_profile.get_device().first_depth_sensor()
-    return pipeline
+    return align, pipeline
 
 class DevNullHandler(asyncore.dispatcher_with_send):
 
@@ -54,12 +64,12 @@ class EtherSenseServer(asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
         print("Launching Realsense Camera Server")
         try:
-            self.pipeline = openPipeline()
-            self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-            print('sending acknowledgement to', address)
+            self.align_to_color, self.pipeline = openPipeline()
         except:
             print("Unexpected error: ", sys.exc_info()[1])
             sys.exit(1)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        print('sending acknowledgement to', address)
         
 	# reduce the resolution of the depth image using post processing
         self.decimate_filter = rs.decimation_filter()
@@ -76,17 +86,19 @@ class EtherSenseServer(asyncore.dispatcher):
 
     def update_frame(self):
         try:
-            depth, timestamp = getDepthAndTimestamp(self.pipeline, self.decimate_filter)
+            color, depth, timestamp = getDepthAndTimestamp(self.align_to_color, self.pipeline, self.decimate_filter)
 
-            if depth is not None:
+            if depth is not None and color is not None:
                 # convert the depth image to a string for broadcast
-                data = pickle.dumps(depth)
+                data_depth = pickle.dumps(depth)
+                data_color = pickle.dumps(color)
                 # capture the lenght of the data portion of the message	
-                length = struct.pack('<I', len(data))
+                length_total = len(data_depth) + len(data_color)
+                length = struct.pack('<III', length_total, len(data_depth), len(data_color))
                 # include the current timestamp for the frame
                 ts = struct.pack('<d', timestamp)
                 # for the message for transmission
-                self.frame_data = b''.join([length, ts, data])
+                self.frame_data = b''.join([length, ts, data_depth, data_color])
         except:
             print("Unexpected error in update frame: ", sys.exc_info()[1])
 

@@ -36,7 +36,8 @@ class ImageClient(asyncore.dispatcher):
     def handle_read(self):
         if self.remainingBytes == 0:
             # get the expected frame size
-            self.frame_length = struct.unpack('<I', self.recv(4))[0]
+            length_bytes = self.recv(12)  # or loop until 12 bytes are received
+            self.frame_length, self.depth_length, self.color_length = struct.unpack('<III', length_bytes)
             # get the timestamp of the current frame
             self.timestamp = struct.unpack('<d', self.recv(8))
             self.remainingBytes = self.frame_length
@@ -51,10 +52,24 @@ class ImageClient(asyncore.dispatcher):
 
     def handle_frame(self):
         # convert the frame from string to numerical data
-        imdata = pickle.loads(self.buffer)
-        bigDepth = cv2.resize(imdata, (0,0), fx=2, fy=2, interpolation=cv2.INTER_NEAREST) 
-        cv2.putText(bigDepth, str(self.timestamp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (65536), 2, cv2.LINE_AA)
-        cv2.imshow("window"+str(self.windowName), bigDepth)
+
+        # Extract depth data from the start of buffer
+        depth_data = self.buffer[:self.depth_length]
+        
+        # Extract color data from after the depth data
+        color_data = self.buffer[self.depth_length:self.depth_length + self.color_length]
+
+        depth_im_data = pickle.loads(depth_data)
+        color_im_data = pickle.loads(color_data)
+        # Convert depth (grayscale) to BGR
+        depth_bgr = cv2.cvtColor(depth_im_data, cv2.COLOR_GRAY2BGR)
+
+        #bigDepth = cv2.resize(depth_im_data, (0,0), fx=2, fy=2, interpolation=cv2.INTER_NEAREST) 
+        img = np.concatenate((color_im_data, depth_bgr), axis=0)
+        # Find max per channel
+
+        cv2.putText(img, str(self.timestamp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (65536), 2, cv2.LINE_AA)
+        cv2.imshow("window"+str(self.windowName), img)
         cv2.waitKey(1)
         self.buffer = bytearray()
         self.frame_id += 1
