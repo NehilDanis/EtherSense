@@ -22,13 +22,13 @@ def getDepthAndTimestamp(pipeline, depth_filter):
     frames.keep()
     depth = frames.get_depth_frame()
     if depth:
-	depth2 = depth_filter.process(depth)
-	# take owner ship of the frame for further processing
-	depth2.keep()
-	# represent the frame as a numpy array
+        depth2 = depth_filter.process(depth)
+        # take owner ship of the frame for further processing
+        depth2.keep()
+        # represent the frame as a numpy array
         depthData = depth2.as_frame().get_data()        
-	depthMat = np.asanyarray(depthData)
-	ts = frames.get_timestamp()
+        depthMat = np.asanyarray(depthData)
+        ts = frames.get_timestamp()
         return depthMat, ts
     else:
         return None, None
@@ -53,13 +53,13 @@ class EtherSenseServer(asyncore.dispatcher):
     def __init__(self, address):
         asyncore.dispatcher.__init__(self)
         print("Launching Realsense Camera Server")
-	try:
+        try:
             self.pipeline = openPipeline()
+            self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+            print('sending acknowledgement to', address)
         except:
             print("Unexpected error: ", sys.exc_info()[1])
             sys.exit(1)
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        print('sending acknowledgement to', address)
         
 	# reduce the resolution of the depth image using post processing
         self.decimate_filter = rs.decimation_filter()
@@ -75,30 +75,37 @@ class EtherSenseServer(asyncore.dispatcher):
         return True
 
     def update_frame(self):
-	depth, timestamp = getDepthAndTimestamp(self.pipeline, self.decimate_filter)
-        if depth is not None:
-	    # convert the depth image to a string for broadcast
-            data = pickle.dumps(depth)
-	    # capture the lenght of the data portion of the message	
-            length = struct.pack('<I', len(data))
-	    # include the current timestamp for the frame
-            ts = struct.pack('<d', timestamp)
-	    # for the message for transmission
-            self.frame_data = ''.join([length, ts, data])
+        try:
+            depth, timestamp = getDepthAndTimestamp(self.pipeline, self.decimate_filter)
+
+            if depth is not None:
+                # convert the depth image to a string for broadcast
+                data = pickle.dumps(depth)
+                # capture the lenght of the data portion of the message	
+                length = struct.pack('<I', len(data))
+                # include the current timestamp for the frame
+                ts = struct.pack('<d', timestamp)
+                # for the message for transmission
+                self.frame_data = b''.join([length, ts, data])
+        except:
+            print("Unexpected error in update frame: ", sys.exc_info()[1])
 
     def handle_write(self):
-	# first time the handle_write is called
-        if not hasattr(self, 'frame_data'):
-            self.update_frame()
-	# the frame has been sent in it entirety so get the latest frame
-        if len(self.frame_data) == 0:
-	    self.update_frame()
-        else:
-	    # send the remainder of the frame_data until there is no data remaining for transmition
-            remaining_size = self.send(self.frame_data)
-            self.frame_data = self.frame_data[remaining_size:]
-	
+        try:
+            # first time the handle_write is called
+            if not hasattr(self, 'frame_data'):
+                self.update_frame()
+            # the frame has been sent in it entirety so get the latest frame
 
+            if len(self.frame_data) == 0:
+                self.update_frame()
+            else:
+                # send the remainder of the frame_data until there is no data remaining for transmition
+                remaining_size = self.send(self.frame_data)
+                self.frame_data = self.frame_data[remaining_size:]
+        except:
+            print("Unexpected error in handle write: ", sys.exc_info()[1])
+	
     def handle_close(self):
         self.close()
             
