@@ -27,8 +27,6 @@ class ImageClient(asyncore.dispatcher):
         self.port = source[1]
         self.buffer = bytearray()
         self.windowName = self.port
-        # open cv window which is unique to the port 
-        cv2.namedWindow("window"+str(self.windowName))
         self.remainingBytes = 0
         self.frame_id = 0
        
@@ -64,11 +62,14 @@ class ImageClient(asyncore.dispatcher):
         depth_bgr = cv2.cvtColor(depth_im_data, cv2.COLOR_GRAY2BGR)
 
         #bigDepth = cv2.resize(depth_im_data, (0,0), fx=2, fy=2, interpolation=cv2.INTER_NEAREST) 
-        img = np.concatenate((color_im_data, depth_bgr), axis=0)
+        #img = np.concatenate((color_im_data, depth_bgr), axis=0)
         # Find max per channel
 
-        cv2.putText(img, str(self.timestamp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (65536), 2, cv2.LINE_AA)
-        cv2.imshow("window"+str(self.windowName), img)
+        cv2.putText(color_im_data, str(self.timestamp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (65536), 2, cv2.LINE_AA)
+        cv2.imshow("window"+str(self.windowName)+"_color", color_im_data)
+
+        cv2.putText(depth_bgr, str(self.timestamp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (65536), 2, cv2.LINE_AA)
+        cv2.imshow("window"+str(self.windowName) + "_depth", depth_bgr)
         cv2.waitKey(1)
         self.buffer = bytearray()
         self.frame_id += 1
