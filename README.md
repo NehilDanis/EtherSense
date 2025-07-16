@@ -2,26 +2,61 @@
 Ethernet client and server for RealSense using python's Asyncore.
 
 ## Prerequisites
-Installation and Setup of Server:
-These steps assume a fresh install of Ubuntu 18.04 on an UpBoard but has also been tested on an Intel NUC.
 
+* Python 3.10 
+
+## How to Start?
+In the jetson board clone this repo with a specific branch and go into the directory. This branch is created for using ethersense on Jetson board
+
+### Cloning to repo with correct branch
 ```
-sudo apt-get update; sudo apt-get upgrade; 
-
-sudo apt-get install python
-
-sudo apt-get install python-pip  
-
-sudo apt-get install git
-```
-
-Clone the repo then run:
-
-```
-sudo python setup.py
+git clone --branch ethersense-for-jetson https://github.com/NehilDanis/EtherSense.git
+cd EtherSense/
 ```
 
-This will first install the pip dependencies, followed by the creation of cronjobs in the /etc/crontab file that maintains an instance of the Server running whenever the device is powered. 
+Still check if you are in the correct branch by running:
+
+```
+git branch
+```
+You should see ethersense-for-jetson shown in green.If not please switch to this branch.
+
+### Create python environment
+
+If you are not already in the EtherSense directory go into that, and run the following commands.
+
+```
+python3.10 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Once the virtual environment is created and the requiremenets are installed, run the following on server and client machines.
+
+#### On Server machine
+
+This repo assumes that you are using aarch64 machine on the Server side. The realsense was not pip installed but pre compiled for aarch64 achitecture with python3.10 support. But in can you use x86 or so, then I believe you can directly add realsese as requirement to the requirements txt file and you do not need to use the pre compiled binaries for realsense.
+
+Connect a realsense device to the server machine. Currently this version does not support selecting different devices, so if you have multiple realsense devices connected to server machine the program will pick one of them.
+
+Once in the virtual environment run the following:
+
+```
+python EtherSenseServer.py
+```
+
+#### On Client machine
+
+Client machine does not need to have realsense, hence does not matter if you are on x86 or aarch64. In my case I had my server on aarch64 and client on x86 machines. 
+
+Once in the virtual environment run the following:
+
+```
+python EtherSenseClient.py
+```
+
+On the client machine you should be able to see the depth and rgb images captured from the camera.
+
 
 ## Overview
 Mulicast broadcast is used to establish connections to servers that are present on the network. 
