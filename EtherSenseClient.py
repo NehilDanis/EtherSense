@@ -12,7 +12,6 @@ import cv2
 print('Number of arguments:', len(sys.argv), 'arguments.')
 print('Argument List:', str(sys.argv))
 mc_ip_address = '224.0.0.1'
-local_ip_address = '192.168.0.1'
 port = 1024
 chunk_size = 4096
 
