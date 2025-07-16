@@ -31,7 +31,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Once the virtual environment is created and the requiremenets are installed, run the following on server and client machines.
+Once the virtual environment is created and the requiremenets are installed, run the following on server and client machines. You have to start first the server software. 
 
 #### On Server machine
 
